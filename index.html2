@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureVault - Personal Secure Storage</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a25;
+            --bg-hover: #22222f;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: #2a2a3a;
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            --gradient-2: linear-gradient(135deg, #0a0a0f 0%, #1a1a25 100%);
+        }
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; line-height: 1.6; }
+        .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--gradient-2); position: relative; overflow: hidden; padding: 20px; }
+        .auth-screen::before { content: ''; position: absolute; width: 500px; height: 500px; background: var(--accent); border-radius: 50%; filter: blur(150px); opacity: 0.15; top: -200px; right: -100px; }
+        .auth-screen::after { content: ''; position: absolute; width: 400px; height: 400px; background: #8b5cf6; border-radius: 50%; filter: blur(150px); opacity: 0.1; bottom: -150px; left: -100px; }
+        .auth-container { background: var(--bg-card); border: 1px solid var(--border); border-radius: 24px; padding: 40px; width: 100%; max-width: 440px; position: relative; z-index: 1; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .auth-logo { text-align: center; margin-bottom: 32px; }
+        .auth-logo i { font-size: 48px; background: var(--gradient-1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .auth-logo h1 { font-size: 28px; margin-top: 16px; font-weight: 700; }
+        .auth-logo p { color: var(--text-secondary); margin-top: 8px; font-size: 14px; }
+        #clerk-auth { display: flex; justify-content: center; margin: 20px 0; }
+        .auth-step { display: none; }
+        .auth-step.active { display: block; }
+        .user-info { display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--bg-secondary); border-radius: 12px; margin-bottom: 24px; }
+        .user-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--gradient-1); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: white; overflow: hidden; }
+        .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .user-details h4 { font-size: 15px; margin-bottom: 2px; }
+        .user-details p { font-size: 13px; color: var(--text-muted); }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 14px; font-weight: 500; }
+        .input-wrapper { position: relative; }
+        .input-wrapper i.input-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+        .input-wrapper input { width: 100%; padding: 14px 48px 14px 48px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; color: var(--text-primary); font-size: 15px; transition: all 0.3s ease; }
+        .input-wrapper input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .input-wrapper .toggle-password { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; }
+        .input-wrapper .toggle-password:hover { color: var(--text-primary); }
+        .password-strength { margin-top: 8px; height: 4px; background: var(--bg-secondary); border-radius: 2px; overflow: hidden; }
+        .password-strength-bar { height: 100%; width: 0; transition: all 0.3s ease; border-radius: 2px; }
+        .strength-weak { width: 33%; background: var(--danger); }
+        .strength-medium { width: 66%; background: var(--warning); }
+        .strength-strong { width: 100%; background: var(--success); }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 24px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; border: none; text-decoration: none; }
+        .btn-primary { width: 100%; background: var(--gradient-1); color: white; box-shadow: 0 4px 15px var(--accent-glow); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px var(--accent-glow); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--bg-hover); border-color: var(--accent); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-sm { padding: 8px 16px; font-size: 13px; }
+        .auth-footer { text-align: center; margin-top: 24px; color: var(--text-muted); font-size: 13px; }
+        .auth-footer i { margin-right: 6px; }
+        .app-container { display: none; min-height: 100vh; }
+        .app-container.active { display: block; }
+        .header { background: var(--bg-secondary); border-bottom: 1px solid var(--border); padding: 16px 24px; position: sticky; top: 0; z-index: 100; }
+        .header-content { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .logo { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 700; }
+        .logo i { font-size: 24px; color: var(--accent); }
+        .search-bar { flex: 1; max-width: 400px; }
+        .search-bar input { width: 100%; padding: 10px 16px 10px 44px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 10px; color: var(--text-primary); font-size: 14px; }
+        .search-bar input:focus { outline: none; border-color: var(--accent); }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .user-menu { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: var(--bg-primary); border-radius: 12px; border: 1px solid var(--border); }
+        .user-menu-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--gradient-1); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white; overflow: hidden; }
+        .user-menu-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .user-menu span { font-size: 14px; color: var(--text-secondary); }
+        .main-content { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: flex; align-items: center; gap: 16px; transition: all 0.3s ease; }
+        .stat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .stat-icon.keys { background: rgba(99, 102, 241, 0.2); color: #6366f1; }
+        .stat-icon.photos { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .stat-icon.notes { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .stat-icon.total { background: rgba(139, 92, 246, 0.2); color: #8b5cf6; }
+        .stat-info h3 { font-size: 24px; font-weight: 700; }
+        .stat-info p { color: var(--text-secondary); font-size: 13px; }
+        .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+        .filter-tabs { display: flex; background: var(--bg-card); border-radius: 12px; padding: 4px; border: 1px solid var(--border); }
+        .filter-tab { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--text-secondary); background: none; border: none; cursor: pointer; transition: all 0.3s ease; }
+        .filter-tab:hover { color: var(--text-primary); }
+        .filter-tab.active { background: var(--accent); color: white; }
+        .items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        .item-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; transition: all 0.3s ease; animation: fadeIn 0.3s ease forwards; }
+        .item-card:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .item-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .item-type { display: flex; align-items: center; gap: 10px; }
+        .item-type-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .item-type-icon.key { background: rgba(99, 102, 241, 0.2); color: #6366f1; }
+        .item-type-icon.photo { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .item-type-icon.note { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .item-type span { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+        .item-actions { display: flex; gap: 8px; }
+        .item-actions button { width: 32px; height: 32px; border-radius: 8px; border: none; background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; }
+        .item-actions button:hover { background: var(--accent); color: white; }
+        .item-actions button.delete:hover { background: var(--danger); }
+        .item-body { padding: 20px; }
+        .item-name { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+        .item-content { margin-bottom: 16px; }
+        .secret-field { background: var(--bg-secondary); border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .secret-value { font-family: 'Courier New', monospace; font-size: 13px; color: var(--text-secondary); word-break: break-all; flex: 1; }
+        .secret-value.masked { letter-spacing: 2px; }
+        .secret-actions { display: flex; gap: 8px; }
+        .secret-actions button { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; transition: color 0.3s ease; }
+        .secret-actions button:hover { color: var(--accent); }
+        .item-photo { width: 100%; height: 200px; object-fit: cover; border-radius: 10px; cursor: pointer; transition: transform 0.3s ease; }
+        .item-photo:hover { transform: scale(1.02); }
+        .item-note { color: var(--text-secondary); font-size: 14px; line-height: 1.7; white-space: pre-wrap; max-height: 150px; overflow-y: auto; }
+        .item-footer { padding: 12px 20px; background: var(--bg-secondary); display: flex; align-items: center; justify-content: space-between; }
+        .item-date { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+        .item-category { font-size: 11px; padding: 4px 10px; background: var(--accent-glow); color: var(--accent); border-radius: 20px; font-weight: 600; }
+        .empty-state { text-align: center; padding: 80px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 64px; margin-bottom: 24px; opacity: 0.5; }
+        .empty-state h3 { font-size: 24px; margin-bottom: 12px; color: var(--text-secondary); }
+        .empty-state p { margin-bottom: 24px; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.3s ease; padding: 20px; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; transform: scale(0.9) translateY(20px); transition: transform 0.3s ease; }
+        .modal-overlay.active .modal { transform: scale(1) translateY(0); }
+        .modal-header { padding: 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .modal-header h2 { font-size: 20px; display: flex; align-items: center; gap: 12px; }
+        .modal-header h2 i { color: var(--accent); }
+        .modal-close { width: 36px; height: 36px; border-radius: 10px; border: none; background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; }
+        .modal-close:hover { background: var(--danger); color: white; }
+        .modal-body { padding: 24px; }
+        .modal-footer { padding: 20px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px 16px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; color: var(--text-primary); font-size: 14px; transition: all 0.3s ease; }
+        .form-group textarea { min-height: 100px; resize: vertical; font-family: inherit; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .type-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .type-option { padding: 16px; background: var(--bg-secondary); border: 2px solid var(--border); border-radius: 12px; cursor: pointer; text-align: center; transition: all 0.3s ease; }
+        .type-option:hover { border-color: var(--accent); }
+        .type-option.selected { border-color: var(--accent); background: var(--accent-glow); }
+        .type-option i { font-size: 24px; margin-bottom: 8px; display: block; }
+        .type-option.key-type i { color: #6366f1; }
+        .type-option.photo-type i { color: #10b981; }
+        .type-option.note-type i { color: #f59e0b; }
+        .type-option span { font-size: 13px; font-weight: 500; }
+        .file-upload { border: 2px dashed var(--border); border-radius: 12px; padding: 32px; text-align: center; cursor: pointer; transition: all 0.3s ease; }
+        .file-upload:hover { border-color: var(--accent); background: var(--accent-glow); }
+        .file-upload i { font-size: 32px; color: var(--text-muted); margin-bottom: 12px; }
+        .file-upload p { color: var(--text-secondary); font-size: 14px; }
+        .file-upload input { display: none; }
+        .preview-image { max-width: 100%; max-height: 200px; border-radius: 10px; margin-top: 16px; }
+        .image-viewer { max-width: 90vw; max-height: 90vh; background: transparent; border: none; }
+        .image-viewer img { max-width: 100%; max-height: 85vh; border-radius: 12px; }
+        .settings-section { margin-bottom: 32px; }
+        .settings-section h3 { font-size: 16px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+        .setting-item { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: var(--bg-secondary); border-radius: 12px; margin-bottom: 12px; }
+        .setting-info h4 { font-size: 15px; margin-bottom: 4px; }
+        .setting-info p { font-size: 13px; color: var(--text-muted); }
+        .toggle { width: 48px; height: 26px; background: var(--bg-primary); border-radius: 13px; position: relative; cursor: pointer; transition: background 0.3s ease; }
+        .toggle.active { background: var(--accent); }
+        .toggle::after { content: ''; width: 20px; height: 20px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.3s ease; }
+        .toggle.active::after { transform: translateX(22px); }
+        .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 2000; display: flex; flex-direction: column; gap: 12px; }
+        .toast { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3); transform: translateX(120%); transition: transform 0.3s ease; min-width: 280px; }
+        .toast.show { transform: translateX(0); }
+        .toast.success { border-left: 4px solid var(--success); }
+        .toast.error { border-left: 4px solid var(--danger); }
+        .toast.warning { border-left: 4px solid var(--warning); }
+        .toast i { font-size: 20px; }
+        .toast.success i { color: var(--success); }
+        .toast.error i { color: var(--danger); }
+        .toast.warning i { color: var(--warning); }
+        .toast-message { flex: 1; font-size: 14px; }
+        @media (max-width: 768px) {
+            .auth-container { padding: 24px; }
+            .header-content { flex-wrap: wrap; }
+            .search-bar { order: 3; max-width: 100%; flex: 100%; margin-top: 12px; }
+            .items-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .form-row { grid-template-columns: 1fr; }
+            .type-selector { grid-template-columns: 1fr; }
+            .user-menu span { display: none; }
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- AUTH SCREEN -->
+    <div class="auth-screen" id="authScreen">
+        <div class="auth-container">
+            <div class="auth-step active" id="stepClerkAuth">
+                <div class="auth-logo">
+                    <i class="fas fa-shield-halved"></i>
+                    <h1>SecureVault</h1>
+                    <p>Your personal encrypted storage</p>
+                </div>
+                <div id="clerk-auth"></div>
+                <div class="auth-footer">
+                    <i class="fas fa-lock"></i>
+                    Your data is encrypted and secure
+                </div>
+            </div>
+            <div class="auth-step" id="stepMasterPassword">
+                <div class="auth-logo">
+                    <i class="fas fa-key"></i>
+                    <h1 id="passwordTitle">Create Master Password</h1>
+                    <p id="passwordDesc">This password encrypts your vault</p>
+                </div>
+                <div class="user-info" id="userInfoCard">
+                    <div class="user-avatar" id="userAvatar"><i class="fas fa-user"></i></div>
+                    <div class="user-details">
+                        <h4 id="userName">User</h4>
+                        <p id="userEmail">user@example.com</p>
+                    </div>
+                </div>
+                <form onsubmit="handleMasterPassword(event)">
+                    <div class="form-group">
+                        <label>Master Password</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" id="masterPassword" placeholder="Enter master password" required minlength="6">
+                            <button type="button" class="toggle-password" onclick="togglePassword('masterPassword')"><i class="fas fa-eye"></i></button>
+                        </div>
+                        <div class="password-strength"><div class="password-strength-bar" id="strengthBar"></div></div>
+                    </div>
+                    <div class="form-group" id="confirmPasswordGroup">
+                        <label>Confirm Password</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" id="confirmPassword" placeholder="Confirm password">
+                            <button type="button" class="toggle-password" onclick="togglePassword('confirmPassword')"><i class="fas fa-eye"></i></button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="masterPasswordBtn">
+                        <i class="fas fa-unlock-alt"></i>
+                        <span id="masterPasswordBtnText">Create Vault</span>
+                    </button>
+                </form>
+                <div class="auth-footer"><i class="fas fa-info-circle"></i> Remember this password - it cannot be recovered!</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div class="app-container" id="appContainer">
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="logo"><i class="fas fa-shield-halved"></i><span>SecureVault</span></div>
+                </div>
+                <div class="search-bar">
+                    <div class="input-wrapper">
+                        <i class="fas fa-search input-icon"></i>
+                        <input type="text" id="searchInput" placeholder="Search your vault...">
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="user-menu">
+                        <div class="user-menu-avatar" id="headerAvatar"><i class="fas fa-user"></i></div>
+                        <span id="headerUserName">User</span>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="openModal('settingsModal')"><i class="fas fa-cog"></i></button>
+                    <button class="btn btn-danger btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
+                </div>
+            </div>
+        </header>
+        <main class="main-content">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-icon keys"><i class="fas fa-key"></i></div><div class="stat-info"><h3 id="keyCount">0</h3><p>Private Keys</p></div></div>
+                <div class="stat-card"><div class="stat-icon photos"><i class="fas fa-image"></i></div><div class="stat-info"><h3 id="photoCount">0</h3><p>Photos</p></div></div>
+                <div class="stat-card"><div class="stat-icon notes"><i class="fas fa-sticky-note"></i></div><div class="stat-info"><h3 id="noteCount">0</h3><p>Private Notes</p></div></div>
+                <div class="stat-card"><div class="stat-icon total"><i class="fas fa-database"></i></div><div class="stat-info"><h3 id="totalCount">0</h3><p>Total Items</p></div></div>
+            </div>
+            <div class="toolbar">
+                <div class="filter-tabs">
+                    <button class="filter-tab active" data-filter="all">All</button>
+                    <button class="filter-tab" data-filter="key">Keys</button>
+                    <button class="filter-tab" data-filter="photo">Photos</button>
+                    <button class="filter-tab" data-filter="note">Notes</button>
+                </div>
+                <button class="btn btn-primary" onclick="openModal('addModal')"><i class="fas fa-plus"></i> Add New</button>
+            </div>
+            <div class="items-grid" id="itemsGrid"></div>
+            <div class="empty-state" id="emptyState">
+                <i class="fas fa-vault"></i>
+                <h3>Your vault is empty</h3>
+                <p>Start by adding your first private key, photo, or note</p>
+                <button class="btn btn-primary" onclick="openModal('addModal')"><i class="fas fa-plus"></i> Add First Item</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- ADD MODAL -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-plus-circle"></i> <span id="modalTitle">Add New Item</span></h2>
+                <button class="modal-close" onclick="closeModal('addModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="itemForm">
+                    <input type="hidden" id="editItemId">
+                    <div class="form-group">
+                        <label>Type</label>
+                        <div class="type-selector">
+                            <div class="type-option key-type selected" data-type="key" onclick="selectType('key')"><i class="fas fa-key"></i><span>Private Key</span></div>
+                            <div class="type-option photo-type" data-type="photo" onclick="selectType('photo')"><i class="fas fa-image"></i><span>Photo</span></div>
+                            <div class="type-option note-type" data-type="note" onclick="selectType('note')"><i class="fas fa-sticky-note"></i><span>Note</span></div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Name *</label><input type="text" id="itemName" placeholder="e.g., Bitcoin Wallet" required></div>
+                        <div class="form-group"><label>Category</label><select id="itemCategory"><option value="crypto">Cryptocurrency</option><option value="personal">Personal</option><option value="work">Work</option><option value="finance">Finance</option><option value="social">Social</option><option value="other">Other</option></select></div>
+                    </div>
+                    <div class="form-group type-content key-content"><label>Private Key / Seed Phrase *</label><textarea id="itemKey" placeholder="Enter your private key or seed phrase..." rows="4"></textarea></div>
+                    <div class="form-group type-content photo-content" style="display:none;"><label>Upload Photo</label><div class="file-upload" onclick="document.getElementById('photoInput').click()"><i class="fas fa-cloud-upload-alt"></i><p>Click to upload</p><input type="file" id="photoInput" accept="image/*" onchange="handlePhotoUpload(event)"></div><img id="photoPreview" class="preview-image" style="display:none;"></div>
+                    <div class="form-group type-content note-content" style="display:none;"><label>Private Note *</label><textarea id="itemNote" placeholder="Enter your private note..." rows="6"></textarea></div>
+                    <div class="form-group"><label>Additional Notes</label><textarea id="itemDescription" placeholder="Any additional information..." rows="3"></textarea></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('addModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveItem()"><i class="fas fa-save"></i> Save Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header"><h2><i class="fas fa-cog"></i> Settings</h2><button class="modal-close" onclick="closeModal('settingsModal')"><i class="fas fa-times"></i></button></div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h3>Account</h3>
+                    <div class="setting-item"><div class="setting-info"><h4 id="settingsEmail">user@example.com</h4><p>Signed in account</p></div></div>
+                </div>
+                <div class="settings-section">
+                    <h3>Security</h3>
+                    <div class="setting-item"><div class="setting-info"><h4>Change Master Password</h4><p>Update your vault's password</p></div><button class="btn btn-secondary btn-sm" onclick="openChangePassword()">Change</button></div>
+                    <div class="setting-item"><div class="setting-info"><h4>Auto-Lock</h4><p>Lock after 5 minutes inactivity</p></div><div class="toggle active" id="autoLockToggle" onclick="toggleAutoLock()"></div></div>
+                </div>
+                <div class="settings-section">
+                    <h3>Data Management</h3>
+                    <div class="setting-item"><div class="setting-info"><h4>Export Backup</h4><p>Download encrypted backup</p></div><button class="btn btn-secondary btn-sm" onclick="exportData()"><i class="fas fa-download"></i> Export</button></div>
+                    <div class="setting-item"><div class="setting-info"><h4>Import Backup</h4><p>Restore from backup</p></div><button class="btn btn-secondary btn-sm" onclick="document.getElementById('importFile').click()"><i class="fas fa-upload"></i> Import</button><input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)"></div>
+                    <div class="setting-item"><div class="setting-info"><h4>Delete All Data</h4><p>Permanently delete vault</p></div><button class="btn btn-danger btn-sm" onclick="deleteAllData()"><i class="fas fa-trash"></i> Delete</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHANGE PASSWORD MODAL -->
+    <div class="modal-overlay" id="changePasswordModal">
+        <div class="modal">
+            <div class="modal-header"><h2><i class="fas fa-key"></i> Change Password</h2><button class="modal-close" onclick="closeModal('changePasswordModal')"><i class="fas fa-times"></i></button></div>
+            <div class="modal-body">
+                <div class="form-group"><label>Current Password</label><div class="input-wrapper"><i class="fas fa-lock input-icon"></i><input type="password" id="currentPasswordInput" required></div></div>
+                <div class="form-group"><label>New Password</label><div class="input-wrapper"><i class="fas fa-lock input-icon"></i><input type="password" id="newPasswordInput" required minlength="6"></div></div>
+                <div class="form-group"><label>Confirm New Password</label><div class="input-wrapper"><i class="fas fa-lock input-icon"></i><input type="password" id="confirmNewPasswordInput" required></div></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('changePasswordModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="changePassword()"><i class="fas fa-check"></i> Update Password</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- IMAGE VIEWER -->
+    <div class="modal-overlay" id="imageViewer" onclick="closeModal('imageViewer')">
+        <div class="modal image-viewer"><img id="viewerImage" src="" alt="Full size image"></div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- CLERK SDK -->
+    <script async crossorigin="anonymous" data-clerk-publishable-key="pk_test_YOUR_CLERK_KEY_HERE" src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js" type="text/javascript"></script>
+    <script>
+        let currentUser = null;
+        let masterPassword = '';
+        let vaultData = [];
+        let currentFilter = 'all';
+        let autoLockEnabled = true;
+        let autoLockTimer = null;
+
+        window.addEventListener('load', async () => {
+            try {
+                await Clerk.load();
+                if (Clerk.user) { currentUser = Clerk.user; showMasterPasswordScreen(); }
+                else { mountClerkSignIn(); }
+                Clerk.addListener(({ user }) => { if (user && !currentUser) { currentUser = user; showMasterPasswordScreen(); } });
+            } catch (error) { console.error('Clerk error:', error); showToast('Auth service unavailable', 'error'); }
+            setupEventListeners();
+        });
+
+        function mountClerkSignIn() {
+            Clerk.mountSignIn(document.getElementById('clerk-auth'), {
+                appearance: { baseTheme: 'dark', variables: { colorPrimary: '#6366f1', colorBackground: '#1a1a25', colorInputBackground: '#12121a', colorText: '#f8fafc', colorTextSecondary: '#94a3b8', borderRadius: '12px' } }
+            });
+        }
+
+        function setupEventListeners() {
+            document.getElementById('masterPassword').addEventListener('input', checkPasswordStrength);
+            document.getElementById('searchInput').addEventListener('input', renderItems);
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    currentFilter = this.dataset.filter;
+                    renderItems();
+                });
+            });
+            document.addEventListener('mousemove', resetAutoLock);
+            document.addEventListener('keypress', resetAutoLock);
+            document.addEventListener('click', resetAutoLock);
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { document.querySelectorAll('.modal-overlay.active').forEach(m => closeModal(m.id)); } });
+        }
+
+        function showMasterPasswordScreen() {
+            document.getElementById('stepClerkAuth').classList.remove('active');
+            document.getElementById('stepMasterPassword').classList.add('active');
+            updateUserDisplay();
+            const vaultKey = `vault_${currentUser.id}`;
+            const existingVault = localStorage.getItem(vaultKey);
+            if (existingVault) {
+                document.getElementById('passwordTitle').textContent = 'Enter Master Password';
+                document.getElementById('passwordDesc').textContent = 'Unlock your secure vault';
+                document.getElementById('masterPasswordBtnText').textContent = 'Unlock Vault';
+                document.getElementById('confirmPasswordGroup').style.display = 'none';
+            } else {
+                document.getElementById('passwordTitle').textContent = 'Create Master Password';
+                document.getElementById('passwordDesc').textContent = 'This password encrypts your vault';
+                document.getElementById('masterPasswordBtnText').textContent = 'Create Vault';
+                document.getElementById('confirmPasswordGroup').style.display = 'block';
+            }
+        }
+
+        function updateUserDisplay() {
+            const name = currentUser.fullName || currentUser.firstName || currentUser.primaryEmailAddress?.emailAddress?.split('@')[0] || 'User';
+            const email = currentUser.primaryEmailAddress?.emailAddress || currentUser.primaryPhoneNumber?.phoneNumber || '';
+            const photo = currentUser.imageUrl;
+            document.getElementById('userName').textContent = name;
+            document.getElementById('userEmail').textContent = email;
+            document.getElementById('headerUserName').textContent = name.split(' ')[0];
+            document.getElementById('settingsEmail').textContent = email;
+            if (photo) { document.getElementById('userAvatar').innerHTML = `<img src="${photo}" alt="Avatar">`; document.getElementById('headerAvatar').innerHTML = `<img src="${photo}" alt="Avatar">`; }
+            else { const initial = name.charAt(0).toUpperCase(); document.getElementById('userAvatar').textContent = initial; document.getElementById('headerAvatar').textContent = initial; }
+        }
+
+        function handleMasterPassword(e) {
+            e.preventDefault();
+            const password = document.getElementById('masterPassword').value;
+            const confirmPwd = document.getElementById('confirmPassword').value;
+            const vaultKey = `vault_${currentUser.id}`;
+            const hashKey = `hash_${currentUser.id}`;
+            const existingVault = localStorage.getItem(vaultKey);
+            if (!existingVault) {
+                if (password !== confirmPwd) { showToast('Passwords do not match!', 'error'); return; }
+                if (password.length < 6) { showToast('Password must be at least 6 characters!', 'error'); return; }
+                localStorage.setItem(hashKey, CryptoJS.SHA256(password).toString());
+                localStorage.setItem(vaultKey, encrypt('[]', password));
+                masterPassword = password; vaultData = [];
+                showToast('Vault created successfully!', 'success');
+                unlockVault();
+            } else {
+                const storedHash = localStorage.getItem(hashKey);
+                if (storedHash !== CryptoJS.SHA256(password).toString()) { showToast('Incorrect password!', 'error'); return; }
+                masterPassword = password;
+                try { vaultData = JSON.parse(decrypt(existingVault, password)); } catch (e) { vaultData = []; }
+                showToast('Vault unlocked!', 'success');
+                unlockVault();
+            }
+        }
+
+        function unlockVault() {
+            document.getElementById('authScreen').style.display = 'none';
+            document.getElementById('appContainer').classList.add('active');
+            renderItems(); updateStats(); resetAutoLock();
+        }
+
+        async function logout() {
+            try { await Clerk.signOut(); } catch (e) {}
+            masterPassword = ''; vaultData = []; currentUser = null;
+            document.getElementById('appContainer').classList.remove('active');
+            document.getElementById('authScreen').style.display = 'flex';
+            document.getElementById('stepMasterPassword').classList.remove('active');
+            document.getElementById('stepClerkAuth').classList.add('active');
+            document.getElementById('masterPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            mountClerkSignIn();
+            if (autoLockTimer) clearTimeout(autoLockTimer);
+        }
+
+        function encrypt(data, password) { return CryptoJS.AES.encrypt(data, password).toString(); }
+        function decrypt(data, password) { return CryptoJS.AES.decrypt(data, password).toString(CryptoJS.enc.Utf8); }
+
+        function checkPasswordStrength() {
+            const password = document.getElementById('masterPassword').value;
+            const bar = document.getElementById('strengthBar');
+            bar.className = 'password-strength-bar';
+            if (!password) { bar.style.width = '0'; return; }
+            let strength = 0;
+            if (password.length >= 8) strength++;
+            if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+            if (/[0-9]/.test(password)) strength++;
+            if (/[^a-zA-Z0-9]/.test(password)) strength++;
+            if (strength <= 1) bar.classList.add('strength-weak');
+            else if (strength <= 2) bar.classList.add('strength-medium');
+            else bar.classList.add('strength-strong');
+        }
+
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const icon = input.nextElementSibling.querySelector('i');
+            input.type = input.type === 'password' ? 'text' : 'password';
+            icon.className = input.type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+        }
+
+        function resetAutoLock() {
+            if (!autoLockEnabled || !masterPassword) return;
+            if (autoLockTimer) clearTimeout(autoLockTimer);
+            autoLockTimer = setTimeout(() => {
+                masterPassword = '';
+                document.getElementById('appContainer').classList.remove('active');
+                document.getElementById('authScreen').style.display = 'flex';
+                showMasterPasswordScreen();
+                showToast('Vault locked due to inactivity', 'warning');
+            }, 5 * 60 * 1000);
+        }
+
+        function toggleAutoLock() {
+            autoLockEnabled = !autoLockEnabled;
+            document.getElementById('autoLockToggle').classList.toggle('active', autoLockEnabled);
+            if (!autoLockEnabled && autoLockTimer) clearTimeout(autoLockTimer);
+            else if (autoLockEnabled) resetAutoLock();
+        }
+
+        function saveVaultData() {
+            const vaultKey = `vault_${currentUser.id}`;
+            localStorage.setItem(vaultKey, encrypt(JSON.stringify(vaultData), masterPassword));
+            updateStats();
+        }
+
+        function updateStats() {
+            document.getElementById('keyCount').textContent = vaultData.filter(i => i.type === 'key').length;
+            document.getElementById('photoCount').textContent = vaultData.filter(i => i.type === 'photo').length;
+            document.getElementById('noteCount').textContent = vaultData.filter(i => i.type === 'note').length;
+            document.getElementById('totalCount').textContent = vaultData.length;
+        }
+
+        function renderItems() {
+            const grid = document.getElementById('itemsGrid');
+            const emptyState = document.getElementById('emptyState');
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            let filteredItems = vaultData;
+            if (currentFilter !== 'all') filteredItems = filteredItems.filter(item => item.type === currentFilter);
+            if (searchTerm) filteredItems = filteredItems.filter(item => item.name.toLowerCase().includes(searchTerm) || item.category.toLowerCase().includes(searchTerm) || (item.description && item.description.toLowerCase().includes(searchTerm)));
+            if (filteredItems.length === 0) { grid.innerHTML = ''; emptyState.style.display = 'block'; return; }
+            emptyState.style.display = 'none';
+            const typeIcons = { key: 'fa-key', photo: 'fa-image', note: 'fa-sticky-note' };
+            const typeLabels = { key: 'Private Key', photo: 'Photo', note: 'Note' };
+            grid.innerHTML = filteredItems.map((item, index) => {
+                let contentHtml = '';
+                if (item.type === 'key') { contentHtml = `<div class="secret-field"><span class="secret-value masked" id="secret-${item.id}">••••••••••••••••••••••••</span><div class="secret-actions"><button onclick="toggleSecret('${item.id}')" title="Show/Hide"><i class="fas fa-eye"></i></button><button onclick="copyToClipboard(\`${item.content.replace(/`/g, '\\`').replace(/\\/g, '\\\\')}\`)" title="Copy"><i class="fas fa-copy"></i></button></div></div>`; }
+                else if (item.type === 'photo') { contentHtml = `<img src="${item.content}" alt="${item.name}" class="item-photo" onclick="viewImage('${item.id}')">`; }
+                else if (item.type === 'note') { contentHtml = `<div class="item-note">${escapeHtml(item.content)}</div>`; }
+                return `<div class="item-card" style="animation-delay: ${index * 0.05}s"><div class="item-header"><div class="item-type"><div class="item-type-icon ${item.type}"><i class="fas ${typeIcons[item.type]}"></i></div><span>${typeLabels[item.type]}</span></div><div class="item-actions"><button onclick="editItem('${item.id}')" title="Edit"><i class="fas fa-edit"></i></button><button class="delete" onclick="deleteItem('${item.id}')" title="Delete"><i class="fas fa-trash"></i></button></div></div><div class="item-body"><h3 class="item-name">${escapeHtml(item.name)}</h3><div class="item-content">${contentHtml}</div>${item.description ? `<p class="item-note" style="max-height:60px;margin-top:12px;font-size:13px;">${escapeHtml(item.description)}</p>` : ''}</div><div class="item-footer"><span class="item-date"><i class="fas fa-clock"></i> ${formatDate(item.updatedAt)}</span><span class="item-category">${item.category}</span></div></div>`;
+            }).join('');
+        }
+
+        function selectType(type) {
+            document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('selected'));
+            document.querySelector(`.type-option[data-type="${type}"]`).classList.add('selected');
+            document.querySelectorAll('.type-content').forEach(content => content.style.display = 'none');
+            document.querySelector(`.${type}-content`).style.display = 'block';
+        }
+
+        function getSelectedType() { return document.querySelector('.type-option.selected').dataset.type; }
+
+        function handlePhotoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) { showToast('Image size should be less than 5MB', 'error'); return; }
+            const reader = new FileReader();
+            reader.onload = function(e) { const preview = document.getElementById('photoPreview'); preview.src = e.target.result; preview.style.display = 'block'; };
+            reader.readAsDataURL(file);
+        }
+
+        function saveItem() {
+            const type = getSelectedType();
+            const name = document.getElementById('itemName').value.trim();
+            const category = document.getElementById('itemCategory').value;
+            const description = document.getElementById('itemDescription').value.trim();
+            const editId = document.getElementById('editItemId').value;
+            if (!name) { showToast('Please enter a name', 'error'); return; }
+            let content = '';
+            if (type === 'key') { content = document.getElementById('itemKey').value.trim(); if (!content) { showToast('Please enter a private key', 'error'); return; } }
+            else if (type === 'photo') { content = document.getElementById('photoPreview').src; if (!content || content === window.location.href) { showToast('Please upload a photo', 'error'); return; } }
+            else if (type === 'note') { content = document.getElementById('itemNote').value.trim(); if (!content) { showToast('Please enter a note', 'error'); return; } }
+            const item = { id: editId || Date.now().toString(), type, name, category, content, description, createdAt: editId ? vaultData.find(i => i.id === editId)?.createdAt : new Date().toISOString(), updatedAt: new Date().toISOString() };
+            if (editId) { const index = vaultData.findIndex(i => i.id === editId); if (index !== -1) vaultData[index] = item; showToast('Item updated!', 'success'); }
+            else { vaultData.unshift(item); showToast('Item added!', 'success'); }
+            saveVaultData(); renderItems(); closeModal('addModal');
+        }
+
+        function editItem(id) {
+            const item = vaultData.find(i => i.id === id);
+            if (!item) return;
+            document.getElementById('editItemId').value = item.id;
+            document.getElementById('modalTitle').textContent = 'Edit Item';
+            document.getElementById('itemName').value = item.name;
+            document.getElementById('itemCategory').value = item.category;
+            document.getElementById('itemDescription').value = item.description || '';
+            selectType(item.type);
+            if (item.type === 'key') document.getElementById('itemKey').value = item.content;
+            else if (item.type === 'photo') { const preview = document.getElementById('photoPreview'); preview.src = item.content; preview.style.display = 'block'; }
+            else if (item.type === 'note') document.getElementById('itemNote').value = item.content;
+            openModal('addModal');
+        }
+
+        function deleteItem(id) { if (!confirm('Are you sure you want to delete this item?')) return; vaultData = vaultData.filter(i => i.id !== id); saveVaultData(); renderItems(); showToast('Item deleted!', 'success'); }
+
+        function toggleSecret(id) {
+            const element = document.getElementById(`secret-${id}`);
+            const item = vaultData.find(i => i.id === id);
+            if (element.classList.contains('masked')) { element.classList.remove('masked'); element.textContent = item.content; }
+            else { element.classList.add('masked'); element.textContent = '••••••••••••••••••••••••'; }
+        }
+
+        function copyToClipboard(text) { navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!', 'success')).catch(() => showToast('Failed to copy', 'error')); }
+
+        function viewImage(id) { const item = vaultData.find(i => i.id === id); if (item) { document.getElementById('viewerImage').src = item.content; openModal('imageViewer'); } }
+
+        function openModal(modalId) { document.getElementById(modalId).classList.add('active'); }
+        function closeModal(modalId) { document.getElementById(modalId).classList.remove('active'); if (modalId === 'addModal') resetForm(); }
+
+        function resetForm() {
+            document.getElementById('itemForm').reset();
+            document.getElementById('editItemId').value = '';
+            document.getElementById('modalTitle').textContent = 'Add New Item';
+            document.getElementById('photoPreview').style.display = 'none';
+            document.getElementById('photoPreview').src = '';
+            selectType('key');
+        }
+
+        function openChangePassword() { closeModal('settingsModal'); openModal('changePasswordModal'); }
+
+        function changePassword() {
+            const current = document.getElementById('currentPasswordInput').value;
+            const newPass = document.getElementById('newPasswordInput').value;
+            const confirmNew = document.getElementById('confirmNewPasswordInput').value;
+            const hashKey = `hash_${currentUser.id}`;
+            if (CryptoJS.SHA256(current).toString() !== localStorage.getItem(hashKey)) { showToast('Current password is incorrect!', 'error'); return; }
+            if (newPass !== confirmNew) { showToast('New passwords do not match!', 'error'); return; }
+            if (newPass.length < 6) { showToast('Password must be at least 6 characters!', 'error'); return; }
+            const vaultKey = `vault_${currentUser.id}`;
+            localStorage.setItem(hashKey, CryptoJS.SHA256(newPass).toString());
+            localStorage.setItem(vaultKey, encrypt(JSON.stringify(vaultData), newPass));
+            masterPassword = newPass;
+            closeModal('changePasswordModal');
+            document.getElementById('changePasswordForm')?.reset();
+            showToast('Password changed successfully!', 'success');
+        }
+
+        function exportData() {
+            const exportData = { version: '2.0', exportDate: new Date().toISOString(), userId: currentUser.id, data: encrypt(JSON.stringify(vaultData), masterPassword) };
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `securevault-backup-${new Date().toISOString().split('T')[0]}.json`; a.click();
+            showToast('Backup exported!', 'success');
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+        
